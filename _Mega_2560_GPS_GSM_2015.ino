@@ -97,6 +97,12 @@ void setup() {
   
    root = SD.open("/");
    printDirectory(root, 0);
+  
+   if (GPRS_Status()) {
+    sms();
+   }
+
+Serial.begin(9600);
 
 }
 
@@ -117,19 +123,29 @@ void loop() {
   delay(1000);
   */
   
-  i2c_scanner();
+ //  i2c_scanner();
   
   // GLCD.CursorTo(0, 1);
   // GLCD.println(millis()/1000);
   
-  // if(Serial3.available()) {
-  //   char nmea = Serial3.read();
-  //   GLCD.print(nmea);
-  //  }
- 
+  if(Serial3.available()) {
+    char nmea = Serial3.read();
+    Serial.print(nmea);
+  }
+  
+  if(Serial.available()) {
+    char nmea = Serial.read();
+    Serial3.print(nmea);
+  }
+  
+  
+  
+  
 }
 
 void sms(void) {
+  Serial3.print("at+cops=?\r\n");
+  delay(500);
   Serial3.print("AT+CMGF=1\r\n");                
   delay(500);
   Serial3.print("AT+CMGS=\"+79636455132\"\r\n"); 
@@ -203,5 +219,36 @@ void printDirectory(File dir, int numTabs) {
      }
      entry.close();
    }
+}
+
+boolean GPRS_Status(void) {
+
+  byte incount = 0; 
+  char xdata[100];
+  char *found = 0;
+
+  Serial3.println("AT+CGATT?");
+  
+  delay(1000);
+
+  if (Serial3.available()) {
+    while (Serial3.available()) {
+      xdata[incount++] = Serial3.read();
+      if (incount == (sizeof(xdata)-2)) { 
+        break; 
+      }
+    }
+
+    xdata[incount] = '\0';
+
+    found = strstr(xdata,"\r\n+SIND: 4\r\n");
+
+    if (found) { 
+      return(true); 
+    } 
+  
+  }
+
+  return(false);
 }
 
