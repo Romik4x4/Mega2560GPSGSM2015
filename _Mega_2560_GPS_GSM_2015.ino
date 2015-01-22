@@ -77,9 +77,20 @@ unsigned long previousMillis;
 
 unsigned long GPRSpreviousMillis = 0; // GPRS/GSM Test
 
+#define ds oneWire
+#define ONE_WIRE_BUS 6
+#define TEMPERATURE_PRECISION 12
+
+OneWire oneWire(ONE_WIRE_BUS);
+DallasTemperature sensors(&oneWire);
+DeviceAddress RTC_Thermometer = {  0x28, 0x13, 0xA9, 0x19, 0x03, 0x00, 0x00, 0x93 }; // D18B20+
+
 void setup() {
   
   Wire.begin();
+  
+  sensors.begin();
+  sensors.setResolution(RTC_Thermometer, TEMPERATURE_PRECISION);
   
   rtc.begin();
   dps.init(MODE_ULTRA_HIGHRES, 25000, true);  // Разрешение BMP180
@@ -295,3 +306,58 @@ void g_print_time( void ) {
   if (month < 10) GLCD.print("0"); GLCD.print(month,DEC);    
 
 }
+
+void g_temp() {
+  
+  float tempC = getTemperature(RTC_Thermometer);
+         tempC = f2c(tempC);
+         
+}
+
+
+// ----------------------------------- getTemperature (no delay) -------------------
+
+float f2c(float val){
+  float aux = val - 32;
+  return (aux * 5 / 9);
+}
+
+void writeTimeToScratchpad(byte* address){
+  ds.reset();
+  ds.select(address);
+  ds.write(0x44,1);
+  delay(10);
+}
+
+void readTimeFromScratchpad(byte* address, byte* data){
+  ds.reset();
+  ds.select(address);
+  ds.write(0xBE);
+  for (byte i=0;i<9;i++){
+    data[i] = ds.read();
+  }
+}
+
+float getTemperature(byte* address){
+
+  int tr;
+  byte data[12];
+
+  writeTimeToScratchpad(address);
+  readTimeFromScratchpad(address,data);
+
+  tr = data[0];
+
+  if (data[1] > 0x80){
+    tr = !tr + 1; 
+    tr = tr * -1; 
+  }
+
+  int cpc = data[7];
+  int cr = data[6];
+
+  tr = tr >> 1;
+
+  return tr - (float)0.25 + (cpc - cr)/(float)cpc;
+}
+
