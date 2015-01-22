@@ -41,7 +41,12 @@
 #define UTC 3
 
 #include <glcd.h>
-#include <fonts/allFonts.h>
+
+#include "fonts/fixednums7x15.h"          // system font
+#include "fonts/TimeFont.h"               // system font
+#include "fonts/fixednums15x31.h"
+#include "fonts/SystemFont5x7.h"
+
 #include "RTClib.h"
 #include <BMP085.h>
 #include <IOexpander.h>
@@ -67,6 +72,11 @@ long Temperature = 0, Pressure = 0, Altitude = 0;
 
 RTC_DS1307 rtc;
 
+unsigned long currentMillis;
+unsigned long previousMillis;
+
+unsigned long GPRSpreviousMillis = 0; // GPRS/GSM Test
+
 void setup() {
   
   Wire.begin();
@@ -76,7 +86,7 @@ void setup() {
   
   // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
    
-  pinMode(30,OUTPUT);
+  pinMode(30,OUTPUT);    // Включаем подсветку экрана
   digitalWrite(30,HIGH);
   
   Serial2.begin(4800);  // GPS EM406 Pin 17
@@ -102,12 +112,30 @@ void setup() {
     sms();
    }
 
-Serial.begin(9600);
 
 }
 
 void loop() {
   
+  currentMillis = millis();
+  
+  if(currentMillis - previousMillis > 1000) {
+   previousMillis = currentMillis; 
+   g_print_time();
+  }
+  
+  
+      /*  if(currentMillis - GPRSpreviousMillis > 2000) {          
+        GPRSpreviousMillis = currentMillis; 
+         if (GPRS_Status()) {
+          sms();
+          GLCD.println("GSM is OK");
+         }
+         GLCD.println("No GSM");
+        }
+        
+        */
+
 /*
   dps.getTemperature(&Temperature); 
   dps.getPressure(&Pressure);
@@ -128,24 +156,9 @@ void loop() {
   // GLCD.CursorTo(0, 1);
   // GLCD.println(millis()/1000);
   
-  if(Serial3.available()) {
-    char nmea = Serial3.read();
-    Serial.print(nmea);
-  }
-  
-  if(Serial.available()) {
-    char nmea = Serial.read();
-    Serial3.print(nmea);
-  }
-  
-  
-  
-  
 }
 
 void sms(void) {
-  Serial3.print("at+cops=?\r\n");
-  delay(500);
   Serial3.print("AT+CMGF=1\r\n");                
   delay(500);
   Serial3.print("AT+CMGS=\"+79636455132\"\r\n"); 
@@ -228,7 +241,6 @@ boolean GPRS_Status(void) {
   char *found = 0;
 
   Serial3.println("AT+CGATT?");
-  
   delay(1000);
 
   if (Serial3.available()) {
@@ -241,14 +253,45 @@ boolean GPRS_Status(void) {
 
     xdata[incount] = '\0';
 
-    found = strstr(xdata,"\r\n+SIND: 4\r\n");
+    found = strstr(xdata,"\r\n+CGATT: 1\r\n");
 
     if (found) { 
       return(true); 
     } 
-  
   }
-
   return(false);
 }
 
+void g_print_time( void ) {
+
+ // ------------ Печатаем время ------------------------------------
+
+ GLCD.CursorToXY(0,0);
+ 
+ DateTime now = rtc.now();
+
+  byte s = now.second();
+  byte m = now.minute();
+  byte h = now.hour();
+  
+  byte monthDay = now.day();
+  byte  month = now.month();
+   
+  GLCD.SelectFont(TimeFont);
+
+  if (h < 10) GLCD.print("0"); GLCD.print(h,DEC); 
+   GLCD.print(":");
+  if (m < 10) GLCD.print("0"); GLCD.print(m,DEC); 
+   GLCD.print(":");
+  if (s < 10) GLCD.print("0"); GLCD.print(s,DEC); 
+
+  // ----------- Печатать Месяц и день -----------------------------
+
+  GLCD.CursorToXY(63,26);
+  GLCD.SelectFont(System5x7);
+
+  if (monthDay < 10) GLCD.print("0"); GLCD.print(monthDay,DEC);
+   GLCD.print("-");
+  if (month < 10) GLCD.print("0"); GLCD.print(month,DEC);    
+
+}
