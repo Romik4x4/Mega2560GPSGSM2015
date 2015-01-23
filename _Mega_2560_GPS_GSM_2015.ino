@@ -75,7 +75,7 @@ RTC_DS1307 rtc;
 unsigned long currentMillis;
 unsigned long previousMillis;
 
-unsigned long GPRSpreviousMillis = 0; // GPRS/GSM Test
+unsigned long GPRSpreviousMillis; // GPRS/GSM Test
 
 #define ds oneWire
 #define ONE_WIRE_BUS 6
@@ -84,6 +84,8 @@ unsigned long GPRSpreviousMillis = 0; // GPRS/GSM Test
 OneWire oneWire(ONE_WIRE_BUS);
 DallasTemperature sensor(&oneWire);
 DeviceAddress ThermometerAddr = {  0x28, 0x13, 0xA9, 0x19, 0x03, 0x00, 0x00, 0x93 }; // D18B20+
+
+boolean GPRS_Stat = false;
 
 void setup() {
   
@@ -118,7 +120,7 @@ void setup() {
    
   i2c_scanner();
    
-  delay(5000);
+  delay(5000);  
    
 //   root = SD.open("/");
 //   printDirectory(root, 0);
@@ -141,6 +143,14 @@ void loop() {
    g_temp();
   }
   
+  if(currentMillis - GPRSpreviousMillis > 10000) {
+   GPRSpreviousMillis = currentMillis; 
+   if (Check_AT_Command()) {
+    //GPRS_Stat = GPRS_Status();
+   }
+   // if (GPRS_Stat) sms();
+  } 
+   
   
       /*  if(currentMillis - GPRSpreviousMillis > 2000) {          
         GPRSpreviousMillis = currentMillis; 
@@ -208,34 +218,6 @@ void printDirectory(File dir, int numTabs) {
    }
 }
 
-boolean GPRS_Status(void) {
-
-  byte incount = 0; 
-  char xdata[100];
-  char *found = 0;
-
-  Serial3.println("AT+CGATT?");
-  delay(1000);
-
-  if (Serial3.available()) {
-    while (Serial3.available()) {
-      xdata[incount++] = Serial3.read();
-      if (incount == (sizeof(xdata)-2)) { 
-        break; 
-      }
-    }
-
-    xdata[incount] = '\0';
-
-    found = strstr(xdata,"\r\n+CGATT: 1\r\n");
-
-    if (found) { 
-      return(true); 
-    } 
-  }
-  return(false);
-}
-
 
 // ------------ Выводим время ------------------------------------
 
@@ -263,7 +245,7 @@ void g_print_time( void ) {
 
 void g_temp() {
     
-   char output[10];
+   char output[8];
    
    sensor.requestTemperatures();
   
@@ -310,5 +292,72 @@ void i2c_scanner() {
       nDevices++;
     }
   }  
+}
+
+
+boolean Check_AT_Command(void) {
+
+  byte incount = 0; 
+  char xdata[100];
+  char *found = 0;
+
+  Serial3.println("AT");
+  delay(1000);
+
+  if (Serial3.available()) {
+    while (Serial3.available()) {
+      xdata[incount++] = Serial3.read();
+      if (incount == (sizeof(xdata)-2)) { 
+        break; 
+      }
+    }
+
+    xdata[incount] = '\0';
+
+    found = strstr(xdata,"\r\nOK\r\n");
+
+    if (found) { 
+      return(true); 
+    } 
+    else { 
+      asm volatile ("  jmp 0"); // Reboot
+      return(false); 
+    }
+
+  }
+
+  return(false);
+}
+
+// ----------------------------------- GPRS Status --------------------------------
+
+boolean GPRS_Status(void) {
+
+  byte incount = 0; 
+  char xdata[100];
+  char *found = 0;
+
+  Serial3.println("AT+CGATT?");
+  delay(1000);
+
+  if (Serial3.available()) {
+    while (Serial3.available()) {
+      xdata[incount++] = Serial3.read();
+      if (incount == (sizeof(xdata)-2)) { 
+        break; 
+      }
+    }
+
+    xdata[incount] = '\0';
+
+    found = strstr(xdata,"\r\n+CGATT: 1\r\n");
+
+    if (found) { 
+      return(true); 
+    } 
+
+  }
+
+  return(false);
 }
 
