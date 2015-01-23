@@ -1,4 +1,3 @@
-11
 ////////////////////////////////////////////////////////////
 // Updated 20.01.2015 Romik
 // Compiled by Arduino - 1.0.6
@@ -83,15 +82,15 @@ unsigned long GPRSpreviousMillis = 0; // GPRS/GSM Test
 #define TEMPERATURE_PRECISION 12
 
 OneWire oneWire(ONE_WIRE_BUS);
-DallasTemperature sensors(&oneWire);
-DeviceAddress RTC_Thermometer = {  0x28, 0x13, 0xA9, 0x19, 0x03, 0x00, 0x00, 0x93 }; // D18B20+
+DallasTemperature sensor(&oneWire);
+DeviceAddress ThermometerAddr = {  0x28, 0x13, 0xA9, 0x19, 0x03, 0x00, 0x00, 0x93 }; // D18B20+
 
 void setup() {
   
   Wire.begin();
   
-  sensors.begin();
-  sensors.setResolution(RTC_Thermometer, TEMPERATURE_PRECISION);
+  sensor.begin();
+  sensor.setResolution(ThermometerAddr, TEMPERATURE_PRECISION);
   
   rtc.begin();
   dps.init(MODE_ULTRA_HIGHRES, 25000, true);  // Разрешение BMP180
@@ -120,20 +119,22 @@ void setup() {
    root = SD.open("/");
    printDirectory(root, 0);
   
-   if (GPRS_Status()) {
-    sms();
-   }
+//   if (GPRS_Status()) {
+//    sms();
+//   }
 
-
+  GLCD.ClearScreen(WHITE);
+  
 }
 
 void loop() {
-  
+
   currentMillis = millis();
   
   if(currentMillis - previousMillis > 1000) {
    previousMillis = currentMillis; 
    g_print_time();
+   g_temp();
   }
   
   
@@ -285,9 +286,6 @@ void g_print_time( void ) {
   byte s = now.second();
   byte m = now.minute();
   byte h = now.hour();
-  
-  byte monthDay = now.day();
-  byte  month = now.month();
    
   GLCD.SelectFont(TimeFont);
 
@@ -296,23 +294,24 @@ void g_print_time( void ) {
   if (m < 10) GLCD.print("0"); GLCD.print(m,DEC); 
    GLCD.print(":");
   if (s < 10) GLCD.print("0"); GLCD.print(s,DEC); 
-
-  // ----------- Печатать Месяц и день -----------------------------
-
-  GLCD.CursorToXY(63,26);
-  GLCD.SelectFont(System5x7);
-
-  if (monthDay < 10) GLCD.print("0"); GLCD.print(monthDay,DEC);
-   GLCD.print("-");
-  if (month < 10) GLCD.print("0"); GLCD.print(month,DEC);    
-
+  
 }
 
 void g_temp() {
+    
+  sensor.requestTemperatures();
   
-  float tempC = getTemperature(RTC_Thermometer);
-         tempC = f2c(tempC);
-         
+  float tempC = sensor.getTempC(ThermometerAddr);
+  
+  GLCD.SelectFont(System5x7);
+    
+   GLCD.CursorToXY(63,26);
+   dps.getPressure(&Pressure);  
+   GLCD.print(Pressure/133.3,0);
+   
+   GLCD.CursorToXY(63,36);
+   GLCD.print(tempC);
+   
 }
 
 
@@ -347,6 +346,8 @@ float getTemperature(byte* address){
   writeTimeToScratchpad(address);
   readTimeFromScratchpad(address,data);
 
+return(( (data[1] << 8) + data[0] )*0.0625);
+
   tr = data[0];
 
   if (data[1] > 0x80){
@@ -360,5 +361,50 @@ float getTemperature(byte* address){
   tr = tr >> 1;
 
   return tr - (float)0.25 + (cpc - cr)/(float)cpc;
+}
+
+// ---------------------- Поиск Темперетаурного датчика DS18x20 ----------------------
+
+void lookUpSensors() {
+  
+  byte sensor[8];
+  
+  byte address[8];
+  int i=0;
+  byte ok = 0, tmp = 0;
+
+  while (ds.search(address)){
+    tmp = 0;
+    //0x10 = DS18S20
+    if (address[0] == 0x10){
+      GLCD.println("Device: DS18S20");
+      tmp = 1;
+    } 
+    else {
+      if (address[0] == 0x28){
+        GLCD.println("Device: DS18B20");
+        tmp = 1;
+      }
+    }
+    if (tmp == 1){
+      if (OneWire::crc8(address, 7) != address[7]){
+        GLCD.println("Not valid CRC!");
+      } 
+      else {
+        for (i=0;i<8;i++){
+          if (address[i] < 9){
+            GLCD.print("0");
+          }
+          GLCD.println(address[i],HEX);
+          sensor[i] = address[i]; // Заполняем Адрес для DS18x20
+        }
+        ok = 1;
+      }
+    } //end if tmp
+  } //end while
+  if (ok == 0){
+    GLCD.println("No devices found");
+    delay(2000);
+  }
 }
 
