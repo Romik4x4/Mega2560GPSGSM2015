@@ -105,19 +105,23 @@ void setup() {
   
   GLCD.Init();
   GLCD.SelectFont(System5x7);
-  GLCD.println("hello, world!");
   
   if(IOexp.init(0x20, MCP23016))
-   GLCD.println("IO expander works!");
+   GLCD.println("MCP23016 is OK.");
   else
-   GLCD.println("No IOexpander!!");  
+   GLCD.println("MCP23016 Error.");
 
-  if (!SD.begin()) {
-    GLCD.println("initialization failed!");
-  }
-  
-   root = SD.open("/");
-   printDirectory(root, 0);
+  if (!SD.begin()) 
+   GLCD.println("SD-CARD Error.");
+  else 
+   GLCD.println("SD-CARD is OK.");
+   
+  i2c_scanner();
+   
+  delay(5000);
+   
+//   root = SD.open("/");
+//   printDirectory(root, 0);
   
 //   if (GPRS_Status()) {
 //    sms();
@@ -176,51 +180,8 @@ void sms(void) {
   delay(500);
   Serial3.print("AT+CMGS=\"+79636455132\"\r\n"); 
   delay(500);
-  Serial3.print("SMS Message");
+  Serial3.print("Mega 2560 GPS GSM is OK.");
   Serial3.print(char(26));
-}
-
-void print_time() {
-  
-    DateTime now = rtc.now();
-    
-    GLCD.print(now.year(), DEC);
-    GLCD.print('/');
-    GLCD.print(now.month(), DEC);
-    GLCD.print('/');
-    GLCD.print(now.day(), DEC);
-    GLCD.print(' ');
-    GLCD.print(now.hour(), DEC);
-    GLCD.print(':');
-    GLCD.print(now.minute(), DEC);
-    GLCD.print(':');
-    GLCD.print(now.second(), DEC);
-    GLCD.println();
-    
-}
-
-void i2c_scanner() {
-  
-  byte error, address;
-  int nDevices;
- 
-  nDevices = 0;
-
-  for(address = 1; address < 127; address++ )
-  {
-    Wire.beginTransmission(address);
-    error = Wire.endTransmission();
- 
-    if (error == 0)
-    {
-      GLCD.print("I2C device: 0x");
-      if (address<16) GLCD.print("0");
-      GLCD.print(address,HEX);
-      GLCD.println("  !");
-      nDevices++;
-    }
-  }  
-  delay(5000);           // wait 5 seconds for next scan
 }
 
 void printDirectory(File dir, int numTabs) {
@@ -275,9 +236,10 @@ boolean GPRS_Status(void) {
   return(false);
 }
 
-void g_print_time( void ) {
 
- // ------------ Печатаем время ------------------------------------
+// ------------ Выводим время ------------------------------------
+
+void g_print_time( void ) {
 
  GLCD.CursorToXY(0,0);
  
@@ -297,114 +259,56 @@ void g_print_time( void ) {
   
 }
 
+// ---------------------- Выводим температуру и давление ----------------------
+
 void g_temp() {
     
-  sensor.requestTemperatures();
+   char output[10];
+   
+   sensor.requestTemperatures();
   
-  float tempC = sensor.getTempC(ThermometerAddr);
+   float tempC = sensor.getTempC(ThermometerAddr);
   
-  GLCD.SelectFont(System5x7);
+   GLCD.SelectFont(System5x7);
     
-   GLCD.CursorToXY(63,26);
+   GLCD.CursorToXY(95,2);
    dps.getPressure(&Pressure);  
-   GLCD.print(Pressure/133.3,0);
+   unsigned int p = Pressure/133.3;
+   sprintf(output,"P:%d",p);
+   GLCD.print(output);
    
-   GLCD.CursorToXY(63,36);
-   GLCD.print(tempC);
+   int t = tempC;
+   sprintf(output,"t:%d",t);
+   GLCD.CursorToXY(95,12);   
+   GLCD.print(output);
    
 }
 
+// --------------- I2C Проверка ---------------------------------
 
-// ----------------------------------- getTemperature (no delay) -------------------
-
-float f2c(float val){
-  float aux = val - 32;
-  return (aux * 5 / 9);
-}
-
-void writeTimeToScratchpad(byte* address){
-  ds.reset();
-  ds.select(address);
-  ds.write(0x44,1);
-  delay(10);
-}
-
-void readTimeFromScratchpad(byte* address, byte* data){
-  ds.reset();
-  ds.select(address);
-  ds.write(0xBE);
-  for (byte i=0;i<9;i++){
-    data[i] = ds.read();
-  }
-}
-
-float getTemperature(byte* address){
-
-  int tr;
-  byte data[12];
-
-  writeTimeToScratchpad(address);
-  readTimeFromScratchpad(address,data);
-
-return(( (data[1] << 8) + data[0] )*0.0625);
-
-  tr = data[0];
-
-  if (data[1] > 0x80){
-    tr = !tr + 1; 
-    tr = tr * -1; 
-  }
-
-  int cpc = data[7];
-  int cr = data[6];
-
-  tr = tr >> 1;
-
-  return tr - (float)0.25 + (cpc - cr)/(float)cpc;
-}
-
-// ---------------------- Поиск Темперетаурного датчика DS18x20 ----------------------
-
-void lookUpSensors() {
+void i2c_scanner() {
   
-  byte sensor[8];
-  
-  byte address[8];
-  int i=0;
-  byte ok = 0, tmp = 0;
+  byte error, address;
+  int nDevices;
+ 
+  nDevices = 0;
 
-  while (ds.search(address)){
-    tmp = 0;
-    //0x10 = DS18S20
-    if (address[0] == 0x10){
-      GLCD.println("Device: DS18S20");
-      tmp = 1;
-    } 
-    else {
-      if (address[0] == 0x28){
-        GLCD.println("Device: DS18B20");
-        tmp = 1;
-      }
+  for(address = 1; address < 127; address++ )
+  {
+    Wire.beginTransmission(address);
+    error = Wire.endTransmission();
+ 
+    if (error == 0)
+    {
+      GLCD.print("I2C: 0x");
+      if (address<16) GLCD.print("0");
+      GLCD.print(address,HEX);
+      if (address == 0x50) GLCD.println(" EEPROM");
+      if (address == 0x68) GLCD.println(" DS1307");
+      if (address == 0x20) GLCD.println(" MCP23016");
+      if (address == 0x77) GLCD.println(" BMP085");
+      nDevices++;
     }
-    if (tmp == 1){
-      if (OneWire::crc8(address, 7) != address[7]){
-        GLCD.println("Not valid CRC!");
-      } 
-      else {
-        for (i=0;i<8;i++){
-          if (address[i] < 9){
-            GLCD.print("0");
-          }
-          GLCD.println(address[i],HEX);
-          sensor[i] = address[i]; // Заполняем Адрес для DS18x20
-        }
-        ok = 1;
-      }
-    } //end if tmp
-  } //end while
-  if (ok == 0){
-    GLCD.println("No devices found");
-    delay(2000);
-  }
+  }  
 }
 
