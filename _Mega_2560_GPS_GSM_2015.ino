@@ -42,8 +42,8 @@
 
 #include <glcd.h>
 
-#include "fonts/fixednums7x15.h"          // system font
-#include "fonts/TimeFont.h"               // system font
+#include "fonts/fixednums7x15.h"          
+#include "TimeFont.h"                     // Romik font
 #include "fonts/fixednums15x31.h"
 #include "fonts/SystemFont5x7.h"
 
@@ -143,13 +143,13 @@ void loop() {
    g_temp();
   }
   
-  if(currentMillis - GPRSpreviousMillis > 10000) {
-   GPRSpreviousMillis = currentMillis; 
-   if (Check_AT_Command()) {
+  //if(currentMillis - GPRSpreviousMillis > 10000) {
+  //GPRSpreviousMillis = currentMillis; 
+  // if (Check_AT_Command()) {
     //GPRS_Stat = GPRS_Status();
-   }
+  // }
    // if (GPRS_Stat) sms();
-  } 
+  //} 
    
   
       /*  if(currentMillis - GPRSpreviousMillis > 2000) {          
