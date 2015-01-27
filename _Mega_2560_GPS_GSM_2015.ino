@@ -43,10 +43,13 @@
 #include <glcd.h>
 
 #include "fonts/fixednums7x15.h"          
-#include "TimeFont.h"                     // Romik font
 #include "fonts/fixednums15x31.h"
 #include "fonts/SystemFont5x7.h"
-#include "fonts/newbasic3x5.h"
+
+// ----- Мои Fonts ------
+
+#include "TimeFont.h"    
+#include "newbasic3x5.h"
 
 
 #include "RTClib.h"
@@ -122,7 +125,7 @@ void setup() {
    
   i2c_scanner();
    
-  delay(5000);  
+  delay(3000);  
    
 //   root = SD.open("/");
 //   printDirectory(root, 0);
@@ -144,6 +147,18 @@ void loop() {
    g_print_time();
    g_temp();
   }
+  
+  // ----------  X1  Y1  X2  Y2
+  GLCD.DrawLine( 0, 55, 126, 55, BLACK);
+  
+  GLCD.SelectFont(newbasic3x5);
+  
+  for(int h=0;h<16;h+=2) {
+   GLCD.GotoXY(1+(8*h),56);
+   GLCD.print(h);
+  }
+  
+
   
   //if(currentMillis - GPRSpreviousMillis > 10000) {
   //GPRSpreviousMillis = currentMillis; 
@@ -235,7 +250,7 @@ void g_print_time( void ) {
    
   GLCD.SelectFont(TimeFont);
 
-  GLCD.SelectFont(newbasic3x5);
+  // GLCD.SelectFont(newbasic3x5);
 
   if (h < 10) GLCD.print("0"); GLCD.print(h,DEC); 
    GLCD.print(":");
