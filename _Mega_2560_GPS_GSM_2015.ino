@@ -46,6 +46,8 @@
 #include "TimeFont.h"                     // Romik font
 #include "fonts/fixednums15x31.h"
 #include "fonts/SystemFont5x7.h"
+#include "fonts/newbasic3x5.h"
+
 
 #include "RTClib.h"
 #include <BMP085.h>
@@ -223,7 +225,7 @@ void printDirectory(File dir, int numTabs) {
 
 void g_print_time( void ) {
 
- GLCD.CursorToXY(0,0);
+ GLCD.CursorToXY(1,1);
  
  DateTime now = rtc.now();
 
@@ -232,6 +234,8 @@ void g_print_time( void ) {
   byte h = now.hour();
    
   GLCD.SelectFont(TimeFont);
+
+  GLCD.SelectFont(newbasic3x5);
 
   if (h < 10) GLCD.print("0"); GLCD.print(h,DEC); 
    GLCD.print(":");
