@@ -37,7 +37,6 @@
 // 18 (interrupt 5), 19 (interrupt 4)
 /////////////////////////////////////////////////////////////////////////////////////////
 
-
 #define UTC 3
 
 #include <glcd.h>
@@ -46,11 +45,10 @@
 #include "fonts/fixednums15x31.h"
 #include "fonts/SystemFont5x7.h"
 
-// ----- Мои Fonts ------
+// ----- Мои Фонты ------
 
 #include "TimeFont.h"    
 #include "newbasic3x5.h"
-
 
 #include "RTClib.h"
 #include <BMP085.h>
@@ -145,10 +143,20 @@ void DrawGrid() {
   GLCD.DrawLine( 15, 27, 15, 63, BLACK); // Вертикаль
   
   GLCD.SelectFont(newbasic3x5);
+
+   GLCD.GotoXY(120,57);
+   GLCD.print(8);
   
-  for(int h=0;h<16;h+=2) {
-   GLCD.GotoXY(1+(8*h),57);
-//   GLCD.print(h);
+  DateTime now = rtc.now();
+
+  byte h_now = now.hour();
+  int m = -5;
+  for(int h=0;h<18;h+=2) {
+   GLCD.GotoXY(120-(h*6),57);
+   GLCD.print(h_now);
+   if (h_now-m > 0) h_now = h_now - m;
+   else 
+  
   }
   
   GLCD.DrawLine( 15, 27, 15, 55, BLACK);
