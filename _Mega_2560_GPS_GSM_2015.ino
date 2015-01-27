@@ -135,7 +135,37 @@ void setup() {
 //   }
 
   GLCD.ClearScreen(WHITE);
+ 
+  DrawGrid(); 
+}
+
+void DrawGrid() {
+
+  GLCD.DrawLine( 0, 55, 126, 55, BLACK); // Горизонт
+  GLCD.DrawLine( 15, 27, 15, 63, BLACK); // Вертикаль
   
+  GLCD.SelectFont(newbasic3x5);
+  
+  for(int h=0;h<16;h+=2) {
+   GLCD.GotoXY(1+(8*h),57);
+//   GLCD.print(h);
+  }
+  
+  GLCD.DrawLine( 15, 27, 15, 55, BLACK);
+  
+  GLCD.GotoXY(1,27);
+  GLCD.print(768);
+
+  GLCD.GotoXY(1,47);
+  GLCD.print(750);
+
+   // ----- Выводим текущие давление ----
+   
+   dps.getPressure(&Pressure);  
+   unsigned int p = Pressure/133.3;
+   GLCD.GotoXY(1,57);
+   GLCD.print(p);
+
 }
 
 void loop() {
@@ -148,15 +178,8 @@ void loop() {
    g_temp();
   }
   
-  // ----------  X1  Y1  X2  Y2
-  GLCD.DrawLine( 0, 55, 126, 55, BLACK);
+ 
   
-  GLCD.SelectFont(newbasic3x5);
-  
-  for(int h=0;h<16;h+=2) {
-   GLCD.GotoXY(1+(8*h),56);
-   GLCD.print(h);
-  }
   
 
   
