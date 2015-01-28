@@ -154,27 +154,32 @@ void DrawGrid() {
   GLCD.DrawLine( 15, 27, 15, 63, BLACK); // Вертикаль
   
   GLCD.SelectFont(newbasic3x5);
-
-   GLCD.GotoXY(120,57);
-   GLCD.print(8);
+  
+  // --------------------------- Выводим линейки времени внизу графика ------
   
   DateTime now = rtc.now();
 
   byte h_now = now.hour();
   
-  int s = 6;
+  byte s = 6;
+  
+  byte array[4] = { 0,6,12,18 };
+
+  if (h_now > 0  && h_now < 6 ) s = 0;
+  if (h_now > 6  && h_now < 12) s = 1; 
+  if (h_now > 12 && h_now < 18) s = 2;
+  if (h_now > 18              ) s = 3;
   
   for(int h=0;h<16;h+=2) {
-   GLCD.GotoXY(119-(h*6),56);
+   GLCD.GotoXY(114-(h*6),56);
    GLCD.print(h_now);
-   
-   if (h_now - s < 0) {
-    h_now = h_now + s;
-   } else { 
-    h_now = h_now - s; 
-   } 
+   h_now = array[s];
+   s++;
+   if (s > 3) s=0;
    
   }
+ 
+  // --------------------- Вывели линейку времени под графиком ---------------------
   
   GLCD.DrawLine( 15, 27, 15, 55, BLACK);
   
