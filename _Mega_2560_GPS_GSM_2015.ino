@@ -137,6 +137,17 @@ void setup() {
   DrawGrid(); 
 }
 
+void DrawBar() {
+
+ for(int x=119;x>23;x--) {
+   int r = random(700, 800);
+   int m = map(r,700,800,55,27);
+   GLCD.DrawLine( x, 55, x, 27, WHITE); 
+   GLCD.DrawLine( x, 55, x, m, BLACK); 
+ }
+ 
+}
+
 void DrawGrid() {
 
   GLCD.DrawLine( 0, 55, 126, 55, BLACK); // Горизонт
@@ -150,13 +161,19 @@ void DrawGrid() {
   DateTime now = rtc.now();
 
   byte h_now = now.hour();
-  int m = -5;
-  for(int h=0;h<18;h+=2) {
-   GLCD.GotoXY(120-(h*6),57);
-   GLCD.print(h_now);
-   if (h_now-m > 0) h_now = h_now - m;
-   else 
   
+  int s = 6;
+  
+  for(int h=0;h<16;h+=2) {
+   GLCD.GotoXY(119-(h*6),56);
+   GLCD.print(h_now);
+   
+   if (h_now - s < 0) {
+    h_now = h_now + s;
+   } else { 
+    h_now = h_now - s; 
+   } 
+   
   }
   
   GLCD.DrawLine( 15, 27, 15, 55, BLACK);
@@ -171,7 +188,7 @@ void DrawGrid() {
    
    dps.getPressure(&Pressure);  
    unsigned int p = Pressure/133.3;
-   GLCD.GotoXY(1,57);
+   GLCD.GotoXY(1,56);
    GLCD.print(p);
 
 }
@@ -184,11 +201,14 @@ void loop() {
    previousMillis = currentMillis; 
    g_print_time();
    g_temp();
+   
+   DrawBar();
+   
   }
   
  
   
-  
+    
 
   
   //if(currentMillis - GPRSpreviousMillis > 10000) {
