@@ -161,7 +161,7 @@ void DrawGrid() {
 
   byte h_now = now.hour();
   
-  byte s = 6;
+  int s = 6;
   
   byte array[4] = { 0,6,12,18 };
 
@@ -172,10 +172,12 @@ void DrawGrid() {
   
   for(int h=0;h<16;h+=2) {
    GLCD.GotoXY(114-(h*6),56);
+   GLCD.print("  ");
+   GLCD.GotoXY(114-(h*6),56);
    GLCD.print(h_now);
    h_now = array[s];
-   s++;
-   if (s > 3) s=0;
+   s--;
+   if (s < 0) s = 3;
    
   }
  
@@ -206,9 +208,8 @@ void loop() {
    previousMillis = currentMillis; 
    g_print_time();
    g_temp();
-   
-   DrawBar();
-   
+   DrawBar();   
+   DrawGrid();
   }
   
  
