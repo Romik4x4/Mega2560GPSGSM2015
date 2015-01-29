@@ -70,24 +70,29 @@
 
 // ----- EEPROM ----------------------------
 
+unsigned long BAR_EEPROM_POS = 0;
+
 struct press_t // Данные о давлении и температуре
 {    
-    double Press,Temp;
+    long Press,Temp;
     unsigned long unix_time; 
     
-} bmp085_data;
+}  bmp085_data;
 
 struct press_t_out // Данные о давлении и температуре
 {    
-    double Press,Temp;
+    long Press,Temp;
     unsigned long unix_time; 
     
-} bmp085_data_out;
+}  bmp085_data_out;
 
 #define EEPROM_ADDRESS_512      (0x50) // EEPROM
-#define EE24LC512MAXBYTES 524288/8
 
-I2C_eeprom eeprom512(EEPROM_ADDRESS_512,EE24LC512MAXBYTES);
+#define EE24LC512MAXBYTES             524288/8
+#define EE24LC32MAXBYTES               32768/8
+#define EE24LC256MAXBYTES             262144/8
+
+I2C_eeprom eeprom512(EEPROM_ADDRESS_512,EE24LC256MAXBYTES);
 
 File root;
 
@@ -119,7 +124,12 @@ boolean GPRS_Stat = false;
 
 void setup() {
   
-  Wire.begin();
+  Wire.begin();  // I2C Attach
+  delay(500);
+  
+  
+  Serial.begin(9600);
+  
   
   sensor.begin();
   sensor.setResolution(ThermometerAddr, TEMPERATURE_PRECISION);
@@ -134,6 +144,7 @@ void setup() {
   
   Serial2.begin(4800);  // GPS EM406 Pin 17
   Serial3.begin(9600);  // GSM Modem
+  
   
   GLCD.Init();
   GLCD.SelectFont(System5x7);
@@ -160,6 +171,10 @@ void setup() {
 //   }
 
   GLCD.ClearScreen(WHITE);
+  
+  // erase_eeprom_bmp085();
+  
+  DrawGrid();
   
 }
 
@@ -221,7 +236,6 @@ void DrawGrid() {
 
    // ----- Выводим текущие давление ----
    
-   dps.getPressure(&Pressure);  
    unsigned int p = Pressure/133.3;
    GLCD.GotoXY(1,56);
    GLCD.print(p);
@@ -246,7 +260,7 @@ void Save_Bar_Data() {
   
    bmp085_data.unix_time = now.unixtime(); // - (60 * 60 * UTC);
    
-   unsigned long BAR_EEPROM_POS = ( (bmp085_data.unix_time/1800)%96 ) * sizeof(bmp085_data); // Номер ячейки памяти.
+   BAR_EEPROM_POS = ( (bmp085_data.unix_time/1800)%96 ) * sizeof(bmp085_data); // Номер ячейки памяти.
    
    const byte* p = (const byte*)(const void*)&bmp085_data;
    for (unsigned int i = 0; i < sizeof(bmp085_data); i++) 
@@ -254,6 +268,8 @@ void Save_Bar_Data() {
    
 }
   
+// -------------------------------- Основной Цикл -------------------------------------------------------------------
+
 void loop() {
 
   currentMillis = millis();
@@ -262,12 +278,15 @@ void loop() {
    previousMillis = currentMillis; 
    g_print_time();
    g_temp();
-   DrawGrid();
+   
+   dps.getPressure(&Pressure);        // Давление
+   dps.getTemperature(&Temperature);  // Температура
+  
   }
   
   if(currentMillis - BarSavePreviousInterval > (FIVE_MINUT*4)) { // Каждые 20 минут Save BAR Parameters 
    BarSavePreviousInterval = currentMillis;
-   Save_Bar_Data();
+   Save_Bar_Data();  
   }
     
 
@@ -333,14 +352,18 @@ void ShowBarData() {
 
  if ( currentMillis - barPreviousInterval > FIVE_MINUT/2 ) {  
       barPreviousInterval = currentMillis;      
+  
+    DrawGrid();  // Обновляем сетку
+   
+   Read_Data_BMP_EEPROM(); // Выводим в Serial все данные.
 
    DateTime now = rtc.now();    
   
-   Average<double> bar_data(96); // Вычисление максимального и минимального значения
+   Average<long> bar_data(96); // Вычисление максимального и минимального значения
    
-   double barArray[96];   
+   long barArray[96];   
    
-   unsigned long BAR_EEPROM_POS = 0;
+   BAR_EEPROM_POS = 0;
     
    for(byte j = 0;j < 96; j++) {           
   
@@ -350,9 +373,9 @@ void ShowBarData() {
      *pp++ = eeprom512.readByte(BAR_EEPROM_POS++); 
      
     if ((now.unixtime() - bmp085_data_out.unix_time) < TWO_DAYS) {
-     barArray[j] = bmp085_data_out.Press;   
-     if (bmp085_data_out.Press != 0.0) 
-      bar_data.push(bmp085_data_out.Press);
+     
+      barArray[j] = bmp085_data_out.Press;   
+      
     } else barArray[j] = 0.0;
     
    }
@@ -361,11 +384,11 @@ void ShowBarData() {
 
    // Давление     
 
-   int m;       // Высота линии
-   int x = 119; // Стартовая позиция
+   int m;             // Высота линии
+   int x = 119;    // Стартовая позиция
    
    byte current_position = (now.unixtime()/1800)%96; 
-    
+        
    for(byte j=0;j<96;j++) {
      
     if (j != 0) m = map(barArray[current_position],bar_data.minimum(),bar_data.maximum(),55,27);  
@@ -570,3 +593,85 @@ boolean GPRS_Status(void) {
   return(false);
 }
 
+
+// --------------------------- Output BMP_085 DATA from EEPROM -----------------------------------
+
+void Read_Data_BMP_EEPROM( void ) {
+  
+   Average<long> bar_data(96); // Вычисление максимального и минимального значения
+   Average<long> tem_data(96); // Вычисление максимального и минимального значения
+   
+   BAR_EEPROM_POS = 0;
+
+   Serial.println("--------------- START -----------------------");
+    
+   DateTime now = rtc.now();
+    
+   for(byte j=0;j<96;j++) {
+           
+    byte* pp = (byte*)(void*)&bmp085_data_out; 
+    for (unsigned int i = 0; i < sizeof(bmp085_data_out); i++)
+     *pp++ = eeprom512.readByte(BAR_EEPROM_POS++);
+    
+    if (bmp085_data_out.Press != 0.0) bar_data.push(bmp085_data_out.Press);
+    
+     tem_data.push(bmp085_data_out.Temp);         
+    
+    Serial.print(bmp085_data_out.Press);      Serial.print(";");
+    Serial.print(bmp085_data_out.Temp);       Serial.print(";");
+    Serial.print(bmp085_data_out.unix_time);  Serial.print(";");
+    Serial.print(now.unixtime() - bmp085_data_out.unix_time); Serial.print(";");
+
+    DateTime eeTime (bmp085_data_out.unix_time);
+
+    Serial.print(eeTime.year()); Serial.print("-");
+    Serial.print(eeTime.month());Serial.print("-");
+    Serial.print(eeTime.day());
+
+    Serial.print("  ");
+
+    Serial.print(eeTime.hour());Serial.print(":");
+    Serial.print(eeTime.minute());Serial.print(":");
+    Serial.print(eeTime.second());
+    
+    
+    Serial.print(" Min/Max: ");
+    Serial.print(map(bmp085_data_out.Press,bar_data.minimum(),bar_data.maximum(),106,1));
+    Serial.print(" ");
+    Serial.print(map(bmp085_data_out.Temp ,tem_data.minimum(),tem_data.maximum(),106,1));
+    
+    
+    Serial.println();
+          
+   }
+   
+   Serial.println("-----------MAX and MIN-------------");
+   Serial.println(bar_data.maximum());
+   Serial.println(bar_data.minimum());
+   Serial.println("");
+   Serial.println(tem_data.maximum());
+   Serial.println(tem_data.minimum());
+   
+   Serial.println("--------------- STOP -----------------------");
+   
+   BAR_EEPROM_POS = 0;
+    
+}
+
+void erase_eeprom_bmp085( void ) {
+  
+  BAR_EEPROM_POS = 0;
+   
+  bmp085_data.Press         = 0.0;
+  bmp085_data.Temp         = 0.0;
+  bmp085_data.unix_time  = 0;
+  
+  while(BAR_EEPROM_POS < (EE24LC512MAXBYTES - (sizeof(bmp085_data) + 1))) {
+   
+   const byte* p = (const byte*)(const void*)&bmp085_data;
+   for (unsigned int i = 0; i < sizeof(bmp085_data); i++)
+    eeprom512.writeByte(BAR_EEPROM_POS++,*p++);
+  }
+    
+  
+}
