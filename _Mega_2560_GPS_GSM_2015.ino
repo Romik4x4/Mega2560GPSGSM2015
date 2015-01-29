@@ -65,6 +65,30 @@
 #include <I2C_eeprom.h>
 #include <Average.h>
 
+#define FIVE_MINUT 300000
+#define TWO_DAYS   172800
+
+// ----- EEPROM ----------------------------
+
+struct press_t // Данные о давлении и температуре
+{    
+    double Press,Temp;
+    unsigned long unix_time; 
+    
+} bmp085_data;
+
+struct press_t_out // Данные о давлении и температуре
+{    
+    double Press,Temp;
+    unsigned long unix_time; 
+    
+} bmp085_data_out;
+
+#define EEPROM_ADDRESS_512      (0x50) // EEPROM
+#define EE24LC512MAXBYTES 524288/8
+
+I2C_eeprom eeprom512(EEPROM_ADDRESS_512,EE24LC512MAXBYTES);
+
 File root;
 
 IOexpander IOexp;
@@ -78,7 +102,10 @@ RTC_DS1307 rtc;
 unsigned long currentMillis;
 unsigned long previousMillis;
 
-unsigned long GPRSpreviousMillis; // GPRS/GSM Test
+unsigned long GPRSpreviousMillis;      // GPRS/GSM Test
+unsigned long BarSavePreviousInterval; // Для барометра сохранять
+unsigned long barPreviousInterval;     // Выводим давление
+
 
 #define ds oneWire
 #define ONE_WIRE_BUS 6
@@ -133,9 +160,10 @@ void setup() {
 //   }
 
   GLCD.ClearScreen(WHITE);
- 
-  DrawGrid(); 
+  
 }
+
+// -------------------------- Рисуем график давления ----------------------------------
 
 void DrawBar() {
 
@@ -147,6 +175,8 @@ void DrawBar() {
  }
  
 }
+
+// ---------------------- Выводим на экран сетку для графиков -----------------------
 
 void DrawGrid() {
 
@@ -161,7 +191,7 @@ void DrawGrid() {
 
   byte h_now = now.hour();
   
-  int s = 6;
+  byte s = 0;
   
   byte array[4] = { 0,6,12,18 };
 
@@ -176,9 +206,7 @@ void DrawGrid() {
    GLCD.GotoXY(114-(h*6),56);
    GLCD.print(h_now);
    h_now = array[s];
-   s--;
-   if (s < 0) s = 3;
-   
+   if (s == 0) s = 3; else s--;   
   }
  
   // --------------------- Вывели линейку времени под графиком ---------------------
@@ -200,6 +228,32 @@ void DrawGrid() {
 
 }
 
+// ------------------------- Записываем данные в EEPROM -------------------
+
+void Save_Bar_Data() {
+
+    // 48 часов * 60 минут = 2880 Минут
+    // 2880 минут / 30 минут = 96 Ячеек
+    // (UnixTime / 1800) % 96 = номер ячейки
+
+  dps.getPressure(&Pressure);        // Давление
+  dps.getTemperature(&Temperature);  // Температура
+   
+  DateTime now = rtc.now();
+       
+  bmp085_data.Press = Pressure/133.3; 
+  bmp085_data.Temp  = Temperature*0.1;
+  
+   bmp085_data.unix_time = now.unixtime(); // - (60 * 60 * UTC);
+   
+   unsigned long BAR_EEPROM_POS = ( (bmp085_data.unix_time/1800)%96 ) * sizeof(bmp085_data); // Номер ячейки памяти.
+   
+   const byte* p = (const byte*)(const void*)&bmp085_data;
+   for (unsigned int i = 0; i < sizeof(bmp085_data); i++) 
+    eeprom512.writeByte(BAR_EEPROM_POS++,*p++);
+   
+}
+  
 void loop() {
 
   currentMillis = millis();
@@ -208,14 +262,17 @@ void loop() {
    previousMillis = currentMillis; 
    g_print_time();
    g_temp();
-   DrawBar();   
    DrawGrid();
   }
   
- 
-  
+  if(currentMillis - BarSavePreviousInterval > (FIVE_MINUT*4)) { // Каждые 20 минут Save BAR Parameters 
+   BarSavePreviousInterval = currentMillis;
+   Save_Bar_Data();
+  }
     
 
+  ShowBarData();
+  
   
   //if(currentMillis - GPRSpreviousMillis > 10000) {
   //GPRSpreviousMillis = currentMillis; 
@@ -258,6 +315,82 @@ void loop() {
   // GLCD.println(millis()/1000);
   
 }
+
+// ---------------- Barometer Graphics ------------------------
+
+void ShowBarData() {
+  
+  /*
+  
+  for(int x=119;x>23;x--) {
+   int r = random(700, 800);
+   int m = map(r,700,800,55,27);
+   GLCD.DrawLine( x, 55, x, 27, WHITE); 
+   GLCD.DrawLine( x, 55, x, m, BLACK); 
+  }
+  
+ */
+
+ if ( currentMillis - barPreviousInterval > FIVE_MINUT/2 ) {  
+      barPreviousInterval = currentMillis;      
+
+   DateTime now = rtc.now();    
+  
+   Average<double> bar_data(96); // Вычисление максимального и минимального значения
+   
+   double barArray[96];   
+   
+   unsigned long BAR_EEPROM_POS = 0;
+    
+   for(byte j = 0;j < 96; j++) {           
+  
+     byte* pp = (byte*)(void*)&bmp085_data_out; 
+  
+    for (unsigned int i = 0; i < sizeof(bmp085_data_out); i++)
+     *pp++ = eeprom512.readByte(BAR_EEPROM_POS++); 
+     
+    if ((now.unixtime() - bmp085_data_out.unix_time) < TWO_DAYS) {
+     barArray[j] = bmp085_data_out.Press;   
+     if (bmp085_data_out.Press != 0.0) 
+      bar_data.push(bmp085_data_out.Press);
+    } else barArray[j] = 0.0;
+    
+   }
+
+   BAR_EEPROM_POS = 0;
+
+   // Давление     
+
+   int m;       // Высота линии
+   int x = 119; // Стартовая позиция
+   
+   byte current_position = (now.unixtime()/1800)%96; 
+    
+   for(byte j=0;j<96;j++) {
+     
+    if (j != 0) m = map(barArray[current_position],bar_data.minimum(),bar_data.maximum(),55,27);  
+    else m = map(Pressure/133.3,bar_data.minimum(),bar_data.maximum(),55,27); // Текущие значение
+
+
+    GLCD.DrawLine( x, 55, x, 27, WHITE); 
+     
+    if (barArray[current_position] != 0.0) {     
+     GLCD.DrawLine( x, 55, x, m, BLACK); 
+  
+    }
+    
+    if (current_position == 0) current_position = 95;
+    
+    current_position--; 
+    
+    x--;
+
+   } 
+  
+  }  
+  
+}
+
 
 void sms(void) {
   Serial3.print("AT+CMGF=1\r\n");                
