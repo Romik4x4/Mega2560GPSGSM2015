@@ -39,6 +39,8 @@
 
 #define UTC 3
 
+#define DEBUG 0
+
 #include <glcd.h>
 
 #include "fonts/fixednums7x15.h"          
@@ -125,11 +127,9 @@ boolean GPRS_Stat = false;
 void setup() {
   
   Wire.begin();  // I2C Attach
-  delay(500);
-  
+  delay(500); 
   
   Serial.begin(9600);
-  
   
   sensor.begin();
   sensor.setResolution(ThermometerAddr, TEMPERATURE_PRECISION);
@@ -143,8 +143,7 @@ void setup() {
   digitalWrite(30,HIGH);
   
   Serial2.begin(4800);  // GPS EM406 Pin 17
-  Serial3.begin(9600);  // GSM Modem
-  
+  Serial3.begin(9600);  // GSM Modem 
   
   GLCD.Init();
   GLCD.SelectFont(System5x7);
@@ -175,6 +174,7 @@ void setup() {
   // erase_eeprom_bmp085();
   
   DrawGrid();
+  ShowBarData(true);  // Start 
   
 }
 
@@ -227,18 +227,6 @@ void DrawGrid() {
   // --------------------- Вывели линейку времени под графиком ---------------------
   
   GLCD.DrawLine( 15, 27, 15, 55, BLACK);
-  
-  GLCD.GotoXY(1,27);
-  GLCD.print(768);
-
-  GLCD.GotoXY(1,47);
-  GLCD.print(750);
-
-   // ----- Выводим текущие давление ----
-   
-   unsigned int p = Pressure/133.3;
-   GLCD.GotoXY(1,56);
-   GLCD.print(p);
 
 }
 
@@ -290,7 +278,7 @@ void loop() {
   }
     
 
-  ShowBarData();
+  ShowBarData(false);
   
   
   //if(currentMillis - GPRSpreviousMillis > 10000) {
@@ -337,7 +325,7 @@ void loop() {
 
 // ---------------- Barometer Graphics ------------------------
 
-void ShowBarData() {
+void ShowBarData(boolean s) {
   
   /*
   
@@ -349,13 +337,15 @@ void ShowBarData() {
   }
   
  */
-
- if ( currentMillis - barPreviousInterval > FIVE_MINUT/2 ) {  
+ 
+ if (s == true) dps.getPressure(&Pressure); 
+ 
+ if (( currentMillis - barPreviousInterval > FIVE_MINUT/2 ) || s == true ) {  
       barPreviousInterval = currentMillis;      
   
     DrawGrid();  // Обновляем сетку
    
-   Read_Data_BMP_EEPROM(); // Выводим в Serial все данные.
+   if (DEBUG) Read_Data_BMP_EEPROM();  // Выводим в Serial все данные.
 
    DateTime now = rtc.now();    
   
@@ -372,14 +362,30 @@ void ShowBarData() {
     for (unsigned int i = 0; i < sizeof(bmp085_data_out); i++)
      *pp++ = eeprom512.readByte(BAR_EEPROM_POS++); 
      
-    if ((now.unixtime() - bmp085_data_out.unix_time) < TWO_DAYS) {
+    if ((now.unixtime() - bmp085_data_out.unix_time) < TWO_DAYS)  {
      
       barArray[j] = bmp085_data_out.Press;   
+      bar_data.push(bmp085_data_out.Press);
+      
+      if (DEBUG) Serial.println( barArray[j]);
       
     } else barArray[j] = 0.0;
     
    }
 
+  // Максимум и Минимум
+  
+  GLCD.GotoXY(1,27);
+  GLCD.print(bar_data.maximum());
+
+  GLCD.GotoXY(1,47);
+  GLCD.print(bar_data.minimum(),DEC);
+  
+   // ----- Выводим текущие давление ----
+   
+   GLCD.GotoXY(1,56);
+   GLCD.print((int)(Pressure/133.3),DEC);
+  
    BAR_EEPROM_POS = 0;
 
    // Давление     
@@ -391,15 +397,15 @@ void ShowBarData() {
         
    for(byte j=0;j<96;j++) {
      
-    if (j != 0) m = map(barArray[current_position],bar_data.minimum(),bar_data.maximum(),55,27);  
-    else m = map(Pressure/133.3,bar_data.minimum(),bar_data.maximum(),55,27); // Текущие значение
+    if (j != 0) m = map(barArray[current_position],bar_data.minimum(),bar_data.maximum(),54,27);  
+    else m = map(Pressure/133.3,bar_data.minimum(),bar_data.maximum(),54,27); // Текущие значение
 
 
-    GLCD.DrawLine( x, 55, x, 27, WHITE); 
+    GLCD.DrawLine( x, 54, x, 27, WHITE);  // Стереть линию
      
     if (barArray[current_position] != 0.0) {     
-     GLCD.DrawLine( x, 55, x, m, BLACK); 
-  
+      GLCD.DrawLine( x, 54, x, m, BLACK); 
+       if (DEBUG) Serial.println(m);
     }
     
     if (current_position == 0) current_position = 95;
