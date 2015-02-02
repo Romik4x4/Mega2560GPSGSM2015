@@ -40,6 +40,7 @@
 #define UTC 3
 
 #define DEBUG 0
+#define GSM_DEBUG 1
 
 #include <glcd.h>
 
@@ -113,6 +114,7 @@ unsigned long GPRSpreviousMillis;      // GPRS/GSM Test
 unsigned long BarSavePreviousInterval; // Для барометра сохранять
 unsigned long barPreviousInterval;     // Выводим давление
 
+#define GSM Serial3
 
 #define ds oneWire
 #define ONE_WIRE_BUS 6
@@ -148,9 +150,11 @@ void setup() {
   GLCD.Init();
   GLCD.SelectFont(System5x7);
   
-  if(IOexp.init(0x20, MCP23016))
-   GLCD.println("MCP23016 is OK.");
-  else
+  if (IOexp.init(0x20, MCP23016)) {
+    GLCD.println("MCP23016 is OK.");
+    IOexp.pinModePort(0,OUTPUT); 
+    IOexp.pinModePort(1,INPUT); 
+  } else
    GLCD.println("MCP23016 Error.");
 
   if (!SD.begin()) 
@@ -197,6 +201,12 @@ void DrawGrid() {
 
   GLCD.DrawLine( 0, 55, 126, 55, BLACK); // Горизонт
   GLCD.DrawLine( 15, 27, 15, 63, BLACK); // Вертикаль
+  
+  GLCD.DrawLine( 15+1, 27, 15+2, 27, BLACK); // Разметка по верикали
+  
+  for(int i=2;i<27;i+=2) {
+   GLCD.DrawLine( 15+1, 27+i, 15+2, 27+i, BLACK); // Разметка по вертикали
+  }
   
   GLCD.SelectFont(newbasic3x5);
   
@@ -277,6 +287,19 @@ void loop() {
    Save_Bar_Data();  
   }
     
+    
+ if (GSM_DEBUG) { 
+   if (GSM.available()) {
+     char in = GSM.read();
+     Serial.print(in);
+   }
+   
+   if (Serial.available()) {
+     char in = Serial.read();
+     GSM.print(in);
+   }
+ }
+   
 
   ShowBarData(false);
   
