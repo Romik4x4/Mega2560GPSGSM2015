@@ -256,7 +256,7 @@ void Save_Bar_Data() {
   bmp085_data.Press = Pressure/133.3; 
   bmp085_data.Temp  = Temperature*0.1;
   
-   bmp085_data.unix_time = now.unixtime(); // - (60 * 60 * UTC);
+   bmp085_data.unix_time = now.unixtime();  // - (60 * 60 * UTC);
    
    BAR_EEPROM_POS = ( (bmp085_data.unix_time/1800)%96 ) * sizeof(bmp085_data); // Номер ячейки памяти.
    
@@ -349,17 +349,6 @@ void loop() {
 // ---------------- Barometer Graphics ------------------------
 
 void ShowBarData(boolean s) {
-  
-  /*
-  
-  for(int x=119;x>23;x--) {
-   int r = random(700, 800);
-   int m = map(r,700,800,55,27);
-   GLCD.DrawLine( x, 55, x, 27, WHITE); 
-   GLCD.DrawLine( x, 55, x, m, BLACK); 
-  }
-  
- */
  
  if (s == true) dps.getPressure(&Pressure); 
  
@@ -372,7 +361,7 @@ void ShowBarData(boolean s) {
 
    DateTime now = rtc.now();    
   
-   Average<long> bar_data(96); // Вычисление максимального и минимального значения
+   Average<long> bar_data(96);  // Вычисление максимального и минимального значения
    
    long barArray[96];   
    
@@ -420,9 +409,11 @@ void ShowBarData(boolean s) {
         
    for(byte j=0;j<96;j++) {
      
-    if (j != 0) m = map(barArray[current_position],bar_data.minimum(),bar_data.maximum(),54,27);  
-    else m = map(Pressure/133.3,bar_data.minimum(),bar_data.maximum(),54,27); // Текущие значение
-
+    if (j != 0) { 
+      m = map(barArray[current_position],bar_data.minimum(),bar_data.maximum(),54,27);  
+    } else {
+      m = map(Pressure/133.3,bar_data.minimum(),bar_data.maximum(),54,27);         // Текущие значение
+    }
 
     GLCD.DrawLine( x, 54, x, 27, WHITE);  // Стереть линию
      
@@ -431,7 +422,9 @@ void ShowBarData(boolean s) {
        if (DEBUG) Serial.println(m);
     }
     
-    if (current_position == 0) current_position = 95;
+    if (DEBUG) Serial.println(current_position);
+    
+    if (current_position == 0) current_position = 96;
     
     current_position--; 
     
