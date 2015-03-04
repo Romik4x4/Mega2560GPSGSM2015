@@ -386,7 +386,7 @@ void ShowBarData(boolean s) {
 
   //  Выводим - Максимум и Минимум
   
-  GLCD.GotoXY(1,27);
+  GLCD.GotoXY(1,25);
   GLCD.print(bar_data.maximum());
 
   GLCD.GotoXY(1,47);
@@ -412,7 +412,7 @@ void ShowBarData(boolean s) {
       m = map(barArray[current_position],bar_data.minimum(),bar_data.maximum(),54,27);  
     } else {
       m = map(Pressure/133.3,bar_data.minimum(),bar_data.maximum(),54,27);         // Текущие значение
-      m = 27;  // текущие значение может не попасть в предел
+      m = 54;  // текущие значение может не попасть в предел
     }
 
     GLCD.DrawLine( x, 54, x, 27, WHITE);  // Стереть линию
