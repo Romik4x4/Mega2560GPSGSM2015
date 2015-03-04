@@ -350,7 +350,7 @@ void loop() {
 
 void ShowBarData(boolean s) {
  
- if (s == true) dps.getPressure(&Pressure); 
+ if (s == true) dps.getPressure(&Pressure);  // Первоначальный запуск
  
  if (( currentMillis - barPreviousInterval > FIVE_MINUT/2 ) || s == true ) {  
       barPreviousInterval = currentMillis;      
@@ -369,9 +369,8 @@ void ShowBarData(boolean s) {
     
    for(byte j = 0;j < 96; j++) {           
   
-     byte* pp = (byte*)(void*)&bmp085_data_out; 
-  
-    for (unsigned int i = 0; i < sizeof(bmp085_data_out); i++)
+     byte* pp = (byte*)(void*)&bmp085_data_out;  
+     for (unsigned int i = 0; i < sizeof(bmp085_data_out); i++)
      *pp++ = eeprom512.readByte(BAR_EEPROM_POS++); 
      
     if ((now.unixtime() - bmp085_data_out.unix_time) < TWO_DAYS)  {
@@ -383,9 +382,9 @@ void ShowBarData(boolean s) {
       
     } else barArray[j] = 0.0;
     
-   }
+   } // Попытались считать все 96 значений давления
 
-  // Максимум и Минимум
+  //  Выводим - Максимум и Минимум
   
   GLCD.GotoXY(1,27);
   GLCD.print(bar_data.maximum());
@@ -413,6 +412,7 @@ void ShowBarData(boolean s) {
       m = map(barArray[current_position],bar_data.minimum(),bar_data.maximum(),54,27);  
     } else {
       m = map(Pressure/133.3,bar_data.minimum(),bar_data.maximum(),54,27);         // Текущие значение
+      m = 27;  // текущие значение может не попасть в предел
     }
 
     GLCD.DrawLine( x, 54, x, 27, WHITE);  // Стереть линию
