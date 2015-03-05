@@ -411,8 +411,11 @@ void ShowBarData(boolean s) {
     if (j != 0) { 
       m = map(barArray[current_position],bar_data.minimum(),bar_data.maximum(),54,27);  
     } else {
-      m = map(Pressure/133.3,bar_data.minimum(),bar_data.maximum(),54,27);         // Текущие значение
-      m = 54;  // текущие значение может не попасть в предел
+      if (Pressure/133.3 < bar_data.maximum() && Pressure/133.3 > bar_data.minimum()) {
+       m = map(Pressure/133.3,bar_data.minimum(),bar_data.maximum(),54,27);         // Текущие значение
+      } else { 
+       m = 54;  // текущие значение может не попасть в предел
+      }
     }
 
     GLCD.DrawLine( x, 54, x, 27, WHITE);  // Стереть линию
