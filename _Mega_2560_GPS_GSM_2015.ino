@@ -44,9 +44,7 @@
 
 #include <glcd.h>
 
-#include "fonts/fixednums7x15.h"          
-#include "fonts/fixednums15x31.h"
-#include "fonts/SystemFont5x7.h"
+#include "fonts/allFonts.h"
 
 // ----- Мои Фонты ------
 
@@ -103,7 +101,7 @@ IOexpander IOexp;
 
 BMP085 dps = BMP085();
 
-long Temperature = 0, Pressure = 0, Altitude = 0;
+long Temperature = 0.0, Pressure = 0.0, Altitude = 0.0;
 
 RTC_DS1307 rtc;
 
@@ -137,9 +135,10 @@ void setup() {
   sensor.setResolution(ThermometerAddr, TEMPERATURE_PRECISION);
   
   rtc.begin();
+  
   dps.init(MODE_ULTRA_HIGHRES, 25000, true);  // Разрешение BMP180
   
-  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
    
   pinMode(30,OUTPUT);    // Включаем подсветку экрана
   digitalWrite(30,HIGH);
@@ -248,15 +247,15 @@ void Save_Bar_Data() {
     // 2880 минут / 30 минут = 96 Ячеек
     // (UnixTime / 1800) % 96 = номер ячейки
 
-  dps.getPressure(&Pressure);        // Давление
   dps.getTemperature(&Temperature);  // Температура
+  dps.getPressure(&Pressure);               // Давление
    
   DateTime now = rtc.now();
        
   bmp085_data.Press = Pressure/133.3; 
   bmp085_data.Temp  = Temperature*0.1;
   
-   bmp085_data.unix_time = now.unixtime();  // - (60 * 60 * UTC);
+   bmp085_data.unix_time = now.unixtime();  
    
    BAR_EEPROM_POS = ( (bmp085_data.unix_time/1800)%96 ) * sizeof(bmp085_data); // Номер ячейки памяти.
    
@@ -277,8 +276,13 @@ void loop() {
    g_print_time();
    g_temp();
    
-   dps.getPressure(&Pressure);        // Давление
+   
+   long avg_press = Pressure;
+   
    dps.getTemperature(&Temperature);  // Температура
+   dps.getPressure(&Pressure);               // Давление
+   
+   Pressure = ( Pressure + avg_press ) / 2.0;
   
   }
   
@@ -486,10 +490,8 @@ void g_print_time( void ) {
   byte m = now.minute();
   byte h = now.hour();
    
-  GLCD.SelectFont(TimeFont);
-
-  // GLCD.SelectFont(newbasic3x5);
-
+  GLCD.SelectFont(TimeFont); // OK  
+     
   if (h < 10) GLCD.print("0"); GLCD.print(h,DEC); 
    GLCD.print(":");
   if (m < 10) GLCD.print("0"); GLCD.print(m,DEC); 
@@ -507,18 +509,13 @@ void g_temp() {
    sensor.requestTemperatures();
   
    float tempC = sensor.getTempC(ThermometerAddr);
-  
-   GLCD.SelectFont(System5x7);
+   
+   GLCD.SelectFont(Arial14 ); 
     
    GLCD.CursorToXY(95,2);
-   dps.getPressure(&Pressure);  
-   unsigned int p = Pressure/133.3;
-   sprintf(output,"P:%d",p);
-   GLCD.print(output);
    
    int t = tempC;
-   sprintf(output,"t:%d",t);
-   GLCD.CursorToXY(95,12);   
+   sprintf(output,"t:%d C",t);
    GLCD.print(output);
    
 }
