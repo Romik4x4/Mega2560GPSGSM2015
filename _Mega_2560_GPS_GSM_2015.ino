@@ -139,7 +139,7 @@ void setup() {
   rtc.begin();
   dps.init(MODE_ULTRA_HIGHRES, 25000, true);  // Разрешение BMP180
   
-  // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
+  rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
    
   pinMode(30,OUTPUT);    // Включаем подсветку экрана
   digitalWrite(30,HIGH);
